@@ -19,6 +19,7 @@ public class PaypalDesk {
             System.out.println("(+) -> Cash in");
             System.out.println("(-) -> Cash out");
             System.out.println("(T) -> Transaction");
+            System.out.println("(TL) -> List transactions");
             System.out.println("(Q) -> Quit");
 
             String command = scanner.nextLine();
@@ -38,6 +39,9 @@ public class PaypalDesk {
                     break;
                 case "T":
                     transaction();
+                    break;
+                case "TL":
+                    listTransaction();
                     break;
                 case "Q":
                     return;
@@ -88,6 +92,15 @@ public class PaypalDesk {
         System.out.println("Cash in successful");
     }
 
+    private static void listTransaction() {
+        List<Transaction> transaction = DbHelper.listTransaction();
+        if(transaction == null) {
+            return;
+        }
+        for(Transaction tr : transaction){
+            System.out.println(tr);
+        }
+    }
     private static void cashOut() {
         int userId = getUserIdFromConsole("User id: ");
         double amount = getAmountFromConsole();

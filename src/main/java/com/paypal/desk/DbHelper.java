@@ -30,15 +30,13 @@ public class DbHelper {
     static int createUser(String firstName, String lastName) {
         String sql = "insert into users " +
                 "(first_name, last_name)" +
-                " values (" +
-                "'" + firstName + "'" +
-                ", " +
-                "'" + lastName + "'" +
-                ")";
+                " values (?, ?)";
 
         try {
-            Statement statement = connection.createStatement();
-            statement.execute(sql);
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setString(1, firstName);
+            preparedStatement.setString(2, lastName);
+            preparedStatement.executeUpdate();
 
             String idSql = "select max(id) from users";
             Statement idStatement = connection.createStatement();
@@ -53,21 +51,13 @@ public class DbHelper {
         }
     }
 
-    /**
-     * Updates the user balance in database
-     * Sets balance = balance + amount
-     *
-     * @param userId id of the user in users table
-     * @param amount double value of the amount to insert
-     */
     static void cashFlow(int userId, double amount) {
-        String sql = "update users set balance =" +
-                "balance +" + amount +
-                "where id = " + userId + ";" ;
+        String sql = "update users set balance = balance + ? where id = ?" ;
         try {
-            Statement statement = connection.createStatement();
-            statement.execute(sql);
-
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setDouble(1, amount);
+            preparedStatement.setInt(2, userId);
+            preparedStatement.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
             return ;
@@ -75,23 +65,29 @@ public class DbHelper {
 
     }
 
-    /**
-     * Emulates a transaction between 2 users
-     * Takes money from one account and adds to another account
-     *
-     * @param userFrom source user id
-     * @param userTo   target user id
-     * @param amount   transaction amount
-     */
     static void transaction(int userFrom, int userTo, double amount) {
-        String sql = "update users set balance = balance -"+ amount +
-                "where id  =" + userFrom +";";
-        String sql1 = "update users set balance = balance +"+ amount +
-                "where id  =" + userTo +";";
+       String sql = "select * from users where id = ?";
         try {
-            Statement statement = connection.createStatement();
-            statement.execute(sql);
-            statement.execute(sql1);
+            PreparedStatement ps = connection.prepareStatement(sql);
+            ps.setInt(1, userFrom);
+            ResultSet resultSet = ps.executeQuery();
+            if (!resultSet.next()){
+                return;
+            }
+            double userAmount = resultSet.getDouble("balance");
+            if (userAmount >= amount){
+                cashFlow(userFrom, -amount);
+                cashFlow(userTo, amount);
+                String sql1 = "insert into transactions (user_from, user_to, transaction_amount) values (?, ?, ?)";
+                PreparedStatement ps1 = getConnection().prepareStatement(sql1);
+                ps1.setInt(1, userFrom);
+                ps1.setInt(2, userTo);
+                ps1.setDouble(3,amount);
+                ps1.execute();
+                System.out.println("Transaction succesfull");
+            }else {
+                System.out.println("Money are not enough");
+            }
 
         } catch (SQLException e ) {
             e.printStackTrace();
@@ -119,6 +115,26 @@ public class DbHelper {
                 ));
             }
             return userList;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    static List<Transaction> listTransaction(){
+        String sql = "select * from transactions ";
+        try {
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(sql);
+            List<Transaction> tr = new ArrayList<>();
+            while (resultSet.next()){
+                int id = resultSet.getInt("id");
+                int userFrom = resultSet.getInt("user_from");
+                int userTo = resultSet.getInt("user_to");
+                double transactionAmount = resultSet.getDouble("transaction_amount");
+                Timestamp timestamp = resultSet.getTimestamp("transaction_date");
+                tr.add(new Transaction(id, userFrom, userTo, transactionAmount, timestamp));
+            }
+            return tr;
         } catch (SQLException e) {
             e.printStackTrace();
             return null;
